@@ -4,7 +4,7 @@ from scrapy.http import Response
 
 
 class EventSpider(Spider):
-    name = "events"
+    name = "berlin_official"
     start_urls = [
         "https://www.berlin.de/special/sport-und-fitness/laufkalender/"
     ]
