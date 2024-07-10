@@ -1,16 +1,18 @@
-from scrapy import Spider, Request
+from scrapy import CrawlSpider, Request
 import logging
 import json
 import chompjs
 import jq
 
+from ..items import RunnersWorldItem
 
-class EventSpider(Spider):
+class EventSpider(CrawlSpider):
     name = "runnersworld"
     start_urls = [
         "https://www.runnersworld.de/laufevents-in-berlin/",
         "https://www.runnersworld.de/laufevents-in-berlin/seite/2/",
     ]
+    # rules = 
 
     def __init__(self):
             self.event_urls_list = []

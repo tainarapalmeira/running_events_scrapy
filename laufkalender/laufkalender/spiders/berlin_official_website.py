@@ -5,9 +5,7 @@ from scrapy.http import Response
 
 class EventSpider(Spider):
     name = "berlin_official"
-    start_urls = [
-        "https://www.berlin.de/special/sport-und-fitness/laufkalender/"
-    ]
+    start_urls = ["https://www.berlin.de/special/sport-und-fitness/laufkalender/"]
 
     def parse(self, response):
         events = response.css("div.inner p.text")
@@ -37,5 +35,6 @@ class EventSpider(Spider):
                 event_details_keys[i]: event_details_values[i]
                 for i in range(len(event_details_keys))
             }
+            # request.post(event_data, api_url)
 
             yield event_data
