@@ -11,3 +11,5 @@ class RunnersWorldItem(Item):
     urlorganizer = Field()
     eventdate = Field()
     distances = Field()
+    # id = Field()
+    # last_updates = Field()

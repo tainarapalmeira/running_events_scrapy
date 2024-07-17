@@ -1,53 +1,47 @@
-from scrapy import CrawlSpider, Request
-import logging
+from scrapy import Spider, Request
+from bs4 import BeautifulSoup
+from laufkalender.items import RunnersWorldItem
 import json
 import chompjs
 import jq
 
-from ..items import RunnersWorldItem
 
-class EventSpider(CrawlSpider):
+class EventSpider(Spider):
     name = "runnersworld"
     start_urls = [
         "https://www.runnersworld.de/laufevents-in-berlin/",
         "https://www.runnersworld.de/laufevents-in-berlin/seite/2/",
     ]
-    # rules = 
 
-    def __init__(self):
-            self.event_urls_list = []
-
-    def get_js_data(self, response):
-        # Extract JavaScript from response
-        javascript = response.css("script::text").getall()
-
-        if not javascript:
-            logging.log("There is no Javascript in response")
-
-        # Parse Javascript object
+    def parse_js_script(self, response):
         try:
-            js_data = chompjs.parse_js_object(javascript[1])
-        except IndexError:
-            logging.log("IndexError: Javascript index out of range")
+            response = response.text
+            soup = BeautifulSoup(response, "html.parser")
+
+            # Extract JavaScript from response
+            js_script = soup.find("script", {"id": "__NEXT_DATA__"}).text
+
+            # Convert parsed JS script object to JSON string
+            js_parsed = chompjs.parse_js_object(js_script)
+
+            js_parsed = json.dumps(js_parsed, indent=4)
+
+            return js_parsed
         except Exception as e:
-            logging.log(f"Error parsing Javascript: {e}")
+            self.logger.error(f"Error parsing JavaScript from response {e}")
+            return None
 
-        return js_data
-
-    def get_event_url(self, response, js_data):
-        # Convert parsed JS object to JSON string
-        json_data = json.dumps(js_data, indent=4)
-
+    def get_event_urls(self, response, js_parsed):
         # Define jq filter: find "events" key and get its data
         jq_filter = '.. | objects | select(has("events")) | .events'
 
         try:
-            events = jq.compile(jq_filter).input(text=json_data).all()
+            event_data_json = jq.compile(jq_filter).input(text=js_parsed).all()
         except Exception as e:
-            logging.log(f"Error applying jq filter: {e}")
+            self.logger.error(f"Error applying jq filter: {e}")
 
         # Convert event data to JSON string
-        event_data_json = json.dumps(events, indent=4)
+        event_data_json = json.dumps(event_data_json, indent=4)
 
         # Define jq filter: find "url" values
         jq_filter = '.. | objects | select(has("url")) | .url'
@@ -55,28 +49,24 @@ class EventSpider(CrawlSpider):
         try:
             event_urls = jq.compile(jq_filter).input(text=event_data_json).all()
         except Exception as e:
-            logging.log(f"Error applying jq filter: {e}")
+            self.logger.error(f"Error applying jq filter: {e}")
 
-        for event in event_urls:
-            if not event in self.event_urls_list:
-                self.event_urls_list.append(event)
+        return event_urls
 
-        return self.event_urls_list
+    def parse_event_data(self, response):
+        response = response.text
+        soup = BeautifulSoup(response, "html.parser")
 
-    def get_event_data(self, response):
         # Extract JavaScript from response
-        javascript = response.css("script::text").getall()
-
-        if not javascript:
-            logging.log("There is no Javascript in response")
+        js_script = soup.find("script", {"id": "__NEXT_DATA__"}).text
 
         # Parse Javascript object
-        try:
-            parsed_js = chompjs.parse_js_object(javascript[1])
-        except IndexError:
-            logging.log("IndexError: Javascript index out of range")
-        except Exception as e:
-            logging.log(f"Error parsing Javascript: {e}")
+        # try:
+        parsed_js = chompjs.parse_js_object(js_script)
+        # except IndexError:
+        #     self.logger.error("IndexError: Javascript index out of range")
+        # except Exception as e:
+        #     self.logger.error(f"Error parsing Javascript: {e}")
 
         # Convert parsed JS object to JSON string
         json_data = json.dumps(parsed_js, indent=4)
@@ -87,7 +77,7 @@ class EventSpider(CrawlSpider):
         try:
             mobile_data = jq.compile(jq_filter).input(text=json_data).all()
         except Exception as e:
-            logging.log(f"Error applying jq filter: {e}")
+            self.logger.error(f"Error applying jq filter: {e}")
 
         # Convert event data to JSON string
         mobile_data_json = json.dumps(mobile_data, indent=4)
@@ -98,34 +88,32 @@ class EventSpider(CrawlSpider):
         try:
             data = jq.compile(jq_filter).input(text=mobile_data_json).all()
         except Exception as e:
-            logging.log(f"Error applying jq filter: {e}")
+            self.logger.error(f"Error applying jq filter: {e}")
 
-        # Convert event data to JSON string
-        foo = data[6]
+        #
+        data = data[6]
 
-        bar = {
-            "title": foo["title"],
-            "description": foo["intro"],
-            "url": foo["url"],
-            "city": foo["city"],
-            "address": f"{foo['zip']}, {foo['street']} {foo['houseNumber']} ({foo['addressAdditionalInfo']})",
-            "mailorganizer": foo["mailOrganizer"],
-            "urlorganizer": foo["urlOrganizer"],
-            "eventdate": foo["eventDate"],
-            "distances": foo["distances"],
-        }
+        event = RunnersWorldItem()
 
-        data_json = json.dumps(bar, indent=4)
+        event["title"] = data["title"]
+        event["description"] = data["intro"]
+        event["url"] = data["url"]
+        event["city"] = data["city"]
+        event["address"] = (
+            f"{data['zip']}, {data['street']} {data['houseNumber']} ({data['addressAdditionalInfo']})"
+        )
+        event["mailorganizer"] = data["mailOrganizer"]
+        event["urlorganizer"] = data["urlOrganizer"]
+        event["eventdate"] = data["eventDate"]
+        event["distances"] = data["distances"]
 
-        with open("event_runnersworld.json", "a") as file:
-            file.write(f"{data_json}")
-        file.close()
+        yield event
 
     def parse(self, response):
         # For the Runner's World website, it is easier to extract data directly from the JavaScript objects in the source code.
         # This approach simplifies parsing compared to extracting data from the rendered HTML.
-        js_data = self.get_js_data(response)
+        js_parsed = self.parse_js_script(response)
 
-        event_urls = self.get_event_url(response, js_data)
+        event_urls = self.get_event_urls(response, js_parsed)
         for event_url in event_urls:
-            yield Request(event_url, callback=self.get_event_data)
+            yield Request(event_url, callback=self.parse_event_data)
