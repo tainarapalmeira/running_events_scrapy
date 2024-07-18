@@ -12,6 +12,9 @@ class EventSpider(Spider):
         "https://www.runnersworld.de/laufevents-in-berlin/",
         "https://www.runnersworld.de/laufevents-in-berlin/seite/2/",
     ]
+    custom_settings = {
+        "ITEM_PIPELINES": {"laufkalender.pipelines.LaufkalenderPipeline": 300}
+    }
 
     def parse_js_script(self, response):
         try:
@@ -90,7 +93,6 @@ class EventSpider(Spider):
         except Exception as e:
             self.logger.error(f"Error applying jq filter: {e}")
 
-        #
         data = data[6]
 
         event = RunnersWorldItem()
