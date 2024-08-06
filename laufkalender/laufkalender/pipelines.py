@@ -7,11 +7,11 @@ import logging
 
 class LaufkalenderPipeline:
     def open_spider(self, spider):
-        self.connection = sqlite3.connect("test_running_eventsevents.db")
+        self.connection = sqlite3.connect("test_running_events.db")
         self.cursor = self.connection.cursor()
         self.cursor.execute(
             """
-            CREATE TABLE IF NOT EXISTS test_berlinofficial(
+            CREATE TABLE IF NOT EXISTS berlinofficial(
                 title TEXT,
                 description TEXT,
                 url TEXT,
@@ -34,12 +34,17 @@ class LaufkalenderPipeline:
     def process_item(self, item, spider):
         event = self.assign_data(item)
 
-        print(f"{event}\n\n\n")
-
         try:
+            # Check if is there any event with the same name before storing it in the db
+            result = self.cursor.execute("SELECT title FROM berlinofficial WHERE title=?", (event['title'],)).fetchone()
+
+            if result:
+                logging.info(f"Duplicate event was found: {result}")
+                return None
+            
             self.cursor.execute(
                 """
-                INSERT INTO test_berlinofficial (
+                INSERT INTO berlinofficial (
                     title, description, url, city, address, mailorganizer, urlorganizer, eventdate, distances, fee, scraped_at
                 ) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -60,8 +65,10 @@ class LaufkalenderPipeline:
             )
             self.connection.commit()
         except sqlite3.Error as err:
-            logging.ERROR('sqlite3 error: %s' % (' '.join(err.args)))
-            logging.ERROR("Exception class is: ", err.__class__)
+            logging.error("sqlite3 error: %s" % (" ".join(err.args)))
+            logging.error("Exception class is: ", err.__class__)
+        except Exception as err:
+            logging.error(f"An error ocurred: {err}")
         return event
 
     def assign_data(self, item):
