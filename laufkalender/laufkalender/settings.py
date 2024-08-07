@@ -63,7 +63,8 @@ ROBOTSTXT_OBEY = True
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-   "laufkalender.pipelines.LaufkalenderPipeline": 300,
+    "laufkalender.pipelines.CleanDataPipeline": 300,
+   "laufkalender.pipelines.LaufkalenderPipeline": 800,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
