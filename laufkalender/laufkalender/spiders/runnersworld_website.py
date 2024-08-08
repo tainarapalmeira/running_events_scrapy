@@ -6,7 +6,7 @@ import chompjs
 import jq
 
 
-class EventSpider(Spider):
+class RunnersWorldSpider(Spider):
     name = "runnersworld"
     start_urls = [
         "https://www.runnersworld.de/laufevents-in-berlin/",
@@ -61,12 +61,10 @@ class EventSpider(Spider):
         js_script = soup.find("script", {"id": "__NEXT_DATA__"}).text
 
         # Parse Javascript object
-        # try:
-        parsed_js = chompjs.parse_js_object(js_script)
-        # except IndexError:
-        #     self.logger.error("IndexError: Javascript index out of range")
-        # except Exception as e:
-        #     self.logger.error(f"Error parsing Javascript: {e}")
+        try:
+            parsed_js = chompjs.parse_js_object(js_script)
+        except Exception as e:
+            self.logger.error(f"Error parsing Javascript: {e}")
 
         # Convert parsed JS object to JSON string
         json_data = json.dumps(parsed_js, indent=4)

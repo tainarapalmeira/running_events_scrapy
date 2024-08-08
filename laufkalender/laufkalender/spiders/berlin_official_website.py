@@ -1,7 +1,7 @@
 from scrapy import Spider, Request
 
 
-class EventSpider(Spider):
+class BerlinOfficialSpider(Spider):
     name = "berlin_official"
     start_urls = ["https://www.berlin.de/special/sport-und-fitness/laufkalender/"]
 
