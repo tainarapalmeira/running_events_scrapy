@@ -1,3 +1,4 @@
+import os
 # Scrapy settings for laufkalender project
 #
 # For simplicity, this file contains only settings considered important or
@@ -63,7 +64,7 @@ ROBOTSTXT_OBEY = True
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-    "laufkalender.pipelines.CleanDataPipeline": 300,
+    # "laufkalender.pipelines.CleanDataPipeline": 300,
    "laufkalender.pipelines.LaufkalenderPipeline": 800,
 }
 
@@ -92,3 +93,7 @@ ITEM_PIPELINES = {
 REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 FEED_EXPORT_ENCODING = "utf-8"
+
+LOG_FILE = os.path.join(os.path.dirname(__file__), "scrapy.log")
+LOG_LEVEL = "ERROR"
+LOG_ENABLED = True

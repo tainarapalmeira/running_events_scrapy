@@ -1,11 +1,11 @@
-from laufkalender.items import BerlinOfficialItem, RunnersWorldItem
 from bs4 import BeautifulSoup
-import sqlite3
 from datetime import datetime
 import logging
+import requests
+import json
 
 
-class CleanDataPipeline:
+class LaufkalenderPipeline:
     # support function to runnersworld spider items
     def convert_event_dates_to_string(self, item):
         return ", ".join(item["eventdate"])
@@ -18,8 +18,9 @@ class CleanDataPipeline:
         return soup.get_text()
 
     def process_item(self, item, spider):
+        url = f"http://localhost:8000/create_event/"
         if spider.name == "berlin_official":
-            event = BerlinOfficialItem()
+            event = {}
 
             event_item_fields = {
                 "title": ["Event", "Laufevent", "Laufkalender"],
@@ -42,88 +43,34 @@ class CleanDataPipeline:
                         event[key] = data
                         break
                     elif field not in event_item_fields[key]:
-                        event[key] = None
-            return event
-        elif spider.name == "runnersworld":
-            event = RunnersWorldItem()
-
-            event["title"] = item["title"]
-            event["description"] = item["description"]
-            event["url"] = item["url"]
-            event["city"] = item["city"]
-            event["address"] = item["address"]
-            event["mailorganizer"] = item["mailorganizer"]
-            event["urlorganizer"] = item["urlorganizer"]
-            event["eventdate"] = self.convert_event_dates_to_string(item)
-            event["distances"] = str(item["distances"][0])
-            event["fee"] = None  # Temporário
-            # event["scraped_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-
-            return event
-
-
-class LaufkalenderPipeline:
-    def open_spider(self, spider):
-        self.connection = sqlite3.connect("running_events.db")
-        self.cursor = self.connection.cursor()
-        self.cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS berlinofficial(
-                title TEXT,
-                description TEXT,
-                url TEXT,
-                city TEXT,
-                address TEXT,
-                mailorganizer TEXT,
-                urlorganizer TEXT,
-                eventdate TEXT,
-                distances TEXT,
-                fee TEXT,
-                scraped_at TEXT
+                        event[key] = ""
+            if event["title"]:
+                event.update(
+                    scraped_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    spider="berlin_official",
                 )
-        """
-        )
-        self.connection.commit()
 
-    def close_spider(self, spider):
-        self.connection.close()
+        if spider.name == "runnersworld":
 
-    def process_item(self, item, spider):
+            event = {
+                "title": item["title"],
+                "description": item["description"],
+                "url": item["url"],
+                "city": item["city"],
+                "address": item["address"],
+                "mailorganizer": item["mailorganizer"],
+                "urlorganizer": item["urlorganizer"],
+                "eventdate": self.convert_event_dates_to_string(item),
+                "distances": str(item["distances"][0]),
+                "fee": "",  # Temporário
+                "scraped_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "spider": "runnersworld",
+            }
+
+        payload_json = json.dumps(event)
         try:
-            # Check if is there any event with the same name before storing it in the db
-            result = self.cursor.execute(
-                "SELECT title FROM berlinofficial WHERE title=?", (item["title"],)
-            ).fetchone()
-
-            if result:
-                logging.info(f"Duplicate event was found: {result}")
-                return None
-
-            self.cursor.execute(
-                """
-                INSERT INTO berlinofficial (
-                    title, description, url, city, address, mailorganizer, urlorganizer, eventdate, distances, fee, scraped_at
-                ) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    item["title"],
-                    item["description"],
-                    item["url"],
-                    item["city"],
-                    item["address"],
-                    item["mailorganizer"],
-                    item["urlorganizer"],
-                    item["eventdate"],
-                    item["distances"],
-                    item["fee"],
-                    datetime.now().isoformat(),
-                ),
-            )
-            self.connection.commit()
-        except sqlite3.Error as err:
-            logging.error("sqlite3 error: %s" % (" ".join(err.args)))
-            logging.error("Exception class is: ", err.__class__)
-        except Exception as err:
-            logging.error(f"An error ocurred: {err}")
-        return item
+            response = requests.post(url, data=payload_json)
+            response.raise_for_status()
+        except requests.RequestException as e:
+            logging.exception(f"Resquest failed: {e}\nFrom event({payload_json.title})")
+        return
