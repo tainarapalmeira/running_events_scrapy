@@ -54,6 +54,18 @@ class LaufkalenderPipeline:
                 mapped_event[key] = ""
 
         return mapped_event
+    
+    # Support function for runnersworld to distances
+    def parse_distances(self, distance):
+        distance = [distance_item["Distanz"] for distance_item in distance]
+        str_distance = "/".join(distance)
+        return str_distance
+    
+    # Support function for runnersworld to parse fee
+    def parse_fee(self, fee):
+        fee = [fee_item["Startgebuehr"] for fee_item in fee]
+        str_fee = "/".join(fee)
+        return str_fee
 
     def create_event_payload(self, item, spider):
         if spider.name == "berlin_official":
@@ -95,8 +107,8 @@ class LaufkalenderPipeline:
                 "eventdate": self.convert_event_dates_to_string(
                     item["eventdate"], spider.name
                 ),
-                "distances": str(item["distances"]),
-                "fee": "",
+                "distances": self.parse_distances(item["distances"]),
+                "fee": self.parse_fee(item["distances"]),
                 "scraped_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "spider": "runnersworld",
             }
