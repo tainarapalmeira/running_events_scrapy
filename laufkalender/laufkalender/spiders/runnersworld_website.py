@@ -9,10 +9,11 @@ import jq
 class RunnersWorldSpider(Spider):
     name = "runnersworld"
     start_urls = [
-        "https://www.runnersworld.de/laufevents-in-berlin/",
-        "https://www.runnersworld.de/laufevents-in-berlin/seite/2/",
+        # "https://www.runnersworld.de/laufevents-in-berlin/",
+        # "https://www.runnersworld.de/laufkalender/?dateFrom=2025-04-28T13%3A44%3A20.651Z&speakingUrl=laufkalender&q=Berlin&isSearchClick=true",
+        "https://www.runnersworld.de/laufkalender/?speakingUrl=laufevents&q=Berlin"
     ]
-    
+
     def parse_js_script(self, response):
         try:
             response = response.text
@@ -32,8 +33,8 @@ class RunnersWorldSpider(Spider):
             return None
 
     def get_event_urls(self, response, js_parsed):
-        # Define jq filter: find "events" key and get its data
-        jq_filter = '.. | objects | select(has("events")) | .events'
+        # Define jq filter: find "mobile" key and get its data
+        jq_filter = '.. | objects | select(has("mobile")) | .mobile'
 
         try:
             event_data_json = jq.compile(jq_filter).input(text=js_parsed).all()
@@ -41,17 +42,32 @@ class RunnersWorldSpider(Spider):
             self.logger.error(f"Error applying jq filter: {e}")
 
         # Convert event data to JSON string
-        event_data_json = json.dumps(event_data_json, indent=4)
+        # LEMBRAR: event_data_json É UMA LISTA COM 3 ITENS E OS DADOS QUE QUERO BUSCAR ESTÁ NO
+        # PRIMEIRO ITEM DESSA LISTA.
+        event_data_json = json.dumps(event_data_json[0], indent=4)
 
-        # Define jq filter: find "url" values
-        jq_filter = '.. | objects | select(has("url")) | .url'
+        # Define jq filter: find "result" values
+        jq_filter = '.. | objects | select(has("result")) | .result'
 
         try:
             event_urls = jq.compile(jq_filter).input(text=event_data_json).all()
         except Exception as e:
             self.logger.error(f"Error applying jq filter: {e}")
 
-        return event_urls
+        # Convert event data to JSON string
+        # LEMBRAR: event_urls É UMA LISTA COM 3 ITENS E OS DADOS QUE QUERO BUSCAR ESTÁ NO
+        # PRIMEIRO ITEM DESSA LISTA.
+        foo = json.dumps(event_urls[0], indent=4)
+
+        # Define jq filter: find "url" values
+        jq_filter = '.. | objects | select(has("url")) | .url'
+
+        try:
+            foo_events_urls = jq.compile(jq_filter).input(text=foo).all()
+        except Exception as e:
+            self.logger.error(f"Error applying jq filter: {e}")
+
+        return foo_events_urls
 
     def parse_event_data(self, response):
         response = response.text
@@ -94,14 +110,14 @@ class RunnersWorldSpider(Spider):
 
         event["title"] = data["title"]
         event["description"] = data["intro"]
-        event["url"] = data["url"]
+        event["event_url"] = data["url"]
         event["city"] = data["city"]
         event["address"] = (
             f"{data['zip']}, {data['street']} {data['houseNumber']} ({data['addressAdditionalInfo']})"
         )
-        event["mailorganizer"] = data["mailOrganizer"]
-        event["urlorganizer"] = data["urlOrganizer"]
-        event["eventdate"] = data["eventDate"]
+        event["organizer_email"] = data["mailOrganizer"]
+        event["organizer_url"] = data["urlOrganizer"]
+        event["event_date"] = data["eventDate"]
         event["distances"] = data["distances"]
 
         yield event

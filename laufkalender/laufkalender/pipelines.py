@@ -8,7 +8,7 @@ import requests
 
 class LaufkalenderPipeline:
     def __init__(self):
-        self.api_url = f"http://localhost:8000/event/"
+        self.api_url = f"http://localhost:8000/create_event/"
 
     def parse_and_format_date(self, eventdate_item):
         parsed_date = dateparser.parse(eventdate_item)
@@ -54,13 +54,13 @@ class LaufkalenderPipeline:
                 mapped_event[key] = ""
 
         return mapped_event
-    
+
     # Support function for runnersworld to distances
     def parse_distances(self, distance):
         distance = [distance_item["Distanz"] for distance_item in distance]
         str_distance = "/".join(distance)
         return str_distance
-    
+
     # Support function for runnersworld to parse fee
     def parse_fee(self, fee):
         fee = [fee_item["Startgebuehr"] for fee_item in fee]
@@ -72,12 +72,12 @@ class LaufkalenderPipeline:
             field_mapping = {
                 "title": ["Event", "Laufevent", "Laufkalender"],
                 "description": [],
-                "url": [],
+                "event_url": [],
                 "city": [],
                 "address": ["Start und Ziel", "Location", "Start"],
-                "mailorganizer": [],
-                "urlorganizer": ["Anmeldung & Information"],
-                "eventdate": ["Beginn", "Startzeit", "Startzeiten", "Termin"],
+                "organizer_email": [],
+                "organizer_url": ["Anmeldung & Information"],
+                "event_date": ["Beginn", "Startzeit", "Startzeiten", "Termin"],
                 "distances": ["Strecke", "Streckenverlauf"],
                 "fee": ["Startgebühr", "Eintritt"],
             }
@@ -86,8 +86,8 @@ class LaufkalenderPipeline:
             if not event.get("title"):
                 raise DropItem("From Berlin_official spider: Missing event title")
 
-            event["eventdate"] = self.convert_event_dates_to_string(
-                event["eventdate"], spider.name
+            event["event_date"] = self.convert_event_dates_to_string(
+                event["event_date"], spider.name
             )
             event.update(
                 scraped_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -99,19 +99,20 @@ class LaufkalenderPipeline:
             event = {
                 "title": item["title"],
                 "description": item["description"],
-                "url": item["url"],
+                "event_url": item["event_url"],
                 "city": item["city"],
                 "address": item["address"],
-                "mailorganizer": item["mailorganizer"],
-                "urlorganizer": item["urlorganizer"],
-                "eventdate": self.convert_event_dates_to_string(
-                    item["eventdate"], spider.name
+                "organizer_email": item["organizer_email"],
+                "organizer_url": item["organizer_url"],
+                "event_date": self.convert_event_dates_to_string(
+                    item["event_date"], spider.name
                 ),
                 "distances": self.parse_distances(item["distances"]),
                 "fee": self.parse_fee(item["distances"]),
                 "scraped_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "spider": "runnersworld",
             }
+            print(event)
             return event
         else:
             logging.warning(f"Unknown spider: {spider.name}")
@@ -122,9 +123,7 @@ class LaufkalenderPipeline:
             response = requests.post(self.api_url, json=payload)
             response.raise_for_status()
         except requests.RequestException as e:
-            logging.error(
-                f"Failed to post event: {payload.get('title', 'Unknown')} | Error: {e}"
-            )
+            logging.error(f"Failed to post event: {payload} | Error: {e}")
 
     def process_item(self, item, spider):
         try:
